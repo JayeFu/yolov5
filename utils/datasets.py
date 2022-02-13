@@ -375,6 +375,12 @@ def img2label_paths(img_paths):
     return [sb.join(x.rsplit(sa, 1)).rsplit('.', 1)[0] + '.txt' for x in img_paths]
 
 
+def img2segment_paths(img_paths):
+    # Define segment paths as a function of image paths
+    sa, sb = os.sep + 'images' + os.sep, os.sep + 'segments' + os.sep  # /images/, /segments/ substrings
+    return [sb.join(x.rsplit(sa, 1)).rsplit('.', 1)[0] + '.npy' for x in img_paths]
+
+
 class LoadImagesAndLabels(Dataset):
     # YOLOv5 train_loader/val_loader, loads images and labels for training and validation
     cache_version = 0.6  # dataset labels *.cache version
@@ -415,6 +421,7 @@ class LoadImagesAndLabels(Dataset):
 
         # Check cache
         self.label_files = img2label_paths(self.img_files)  # labels
+        self.segment_files = img2segment_paths(self.img_files)  # segments for foreground
         cache_path = (p if p.is_file() else Path(self.label_files[0]).parent).with_suffix('.cache')
         try:
             cache, exists = np.load(cache_path, allow_pickle=True).item(), True  # load dict
