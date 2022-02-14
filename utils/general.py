@@ -416,6 +416,15 @@ def check_dataset(data, autodownload=True):
         if data.get(k):  # prepend path
             data[k] = str(path / data[k]) if isinstance(data[k], str) else [str(path / x) for x in data[k]]
 
+    if data.get('back'):  # have backgrounds
+        back_data = data['back']
+        back_path = Path(back_data.get('path'))
+        if not back_path.is_absolute():
+            back_path = (ROOT / back_path).resolve()
+        for k in 'train', 'val':
+            if back_data.get(k):  # prepend path
+                back_data[k] = str(back_path / back_data[k]) if isinstance(back_data[k], str) else [str(back_path / x) for x in back_data[k]]
+
     # Parse yaml
     assert 'nc' in data, "Dataset 'nc' key missing."
     if 'names' not in data:
