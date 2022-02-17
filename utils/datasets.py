@@ -93,7 +93,7 @@ def exif_transpose(image):
     return image
 
 
-def create_dataloader(path, back_path, imgsz, batch_size, stride, single_cls=False, hyp=None, augment=False, cache=False, pad=0.0,
+def create_dataloader(path, back_path, imgsz, batch_size, stride, single_cls=False, hyp=None, augment=False, grayscale=False, cache=False, pad=0.0,
                       rect=False, rank=-1, workers=8, image_weights=False, quad=False, prefix='', shuffle=False):
     if rect and shuffle:
         LOGGER.warning('WARNING: --rect is incompatible with DataLoader shuffle, setting shuffle=False')
@@ -101,6 +101,7 @@ def create_dataloader(path, back_path, imgsz, batch_size, stride, single_cls=Fal
     with torch_distributed_zero_first(rank):  # init dataset *.cache only once if DDP
         dataset = LoadImagesAndLabels(path, back_path, imgsz, batch_size,
                                       augment=augment,  # augmentation
+                                      grayscale=grayscale,  # grayscale
                                       hyp=hyp,  # hyperparameters
                                       rect=rect,  # rectangular batches
                                       cache_images=cache,
@@ -387,7 +388,7 @@ class LoadImagesAndLabels(Dataset):
     # YOLOv5 train_loader/val_loader, loads images and labels for training and validation
     cache_version = 0.6  # dataset labels *.cache version
 
-    def __init__(self, path, back_path=None, img_size=640, batch_size=16, augment=False, hyp=None, rect=False, image_weights=False,
+    def __init__(self, path, back_path=None, img_size=640, batch_size=16, augment=False, grayscale=False, hyp=None, rect=False, image_weights=False,
                  cache_images=False, single_cls=False, stride=32, pad=0.0, prefix=''):
         self.img_size = img_size
         self.augment = augment
@@ -400,6 +401,7 @@ class LoadImagesAndLabels(Dataset):
         self.path = path
         self.albumentations = Albumentations() if augment else None
         self.img_comp = ImgComposition4YOLO(back_path=back_path, resize=False)  # hardcode to not resize
+        self.grayscale = grayscale
 
         try:
             f = []  # image files
@@ -647,7 +649,7 @@ class LoadImagesAndLabels(Dataset):
                 f = self.img_files[i]
                 im = cv2.imread(f)  # BGR
                 assert im is not None, f'Image Not Found {f}'
-            im = self.img_comp.composite_img_from_seg_file(src_img=im, seg_path=self.segment_files[i])  # change background
+            im = self.img_comp.composite_img_from_seg_file(src_img=im, seg_path=self.segment_files[i], grayscale=self.grayscale)  # change background
             h0, w0 = im.shape[:2]  # orig hw
             r = self.img_size / max(h0, w0)  # ratio
             if r != 1:  # if sizes are not equal
