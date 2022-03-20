@@ -32,6 +32,8 @@ from utils.general import (DATASETS_DIR, LOGGER, NUM_THREADS, check_dataset, che
                            segments2boxes, xyn2xy, xywh2xyxy, xywhn2xyxy, xyxy2xywhn)
 from utils.torch_utils import torch_distributed_zero_first
 
+from drone_racing.adaptation.yolo_integrate.augmentations import Augmentor
+
 # Parameters
 HELP_URL = 'https://github.com/ultralytics/yolov5/wiki/Train-Custom-Data'
 IMG_FORMATS = 'bmp', 'dng', 'jpeg', 'jpg', 'mpo', 'png', 'tif', 'tiff', 'webp'  # include image suffixes
@@ -393,6 +395,10 @@ class LoadImagesAndLabels(Dataset):
         self.stride = stride
         self.path = path
         self.albumentations = Albumentations() if augment else None
+        self.augmentor = Augmentor(
+            background_dir=hyp['soda']['background_dir'],
+            augment_dict=hyp['soda']['augment_dict']['train'] if 'train' in prefix else hyp['soda']['augment_dict']['val']
+        )
 
         try:
             f = []  # image files
@@ -612,6 +618,11 @@ class LoadImagesAndLabels(Dataset):
             # labels = cutout(img, labels, p=0.5)
             # nl = len(labels)  # update after cutout
 
+        # backup original img
+        ori_img = np.copy(img)
+        # then call augmentor to augment img
+        img, labels = self.augmentor.augment(img, labels)
+
         labels_out = torch.zeros((nl, 6))
         if nl:
             labels_out[:, 1:] = torch.from_numpy(labels)
@@ -620,7 +631,7 @@ class LoadImagesAndLabels(Dataset):
         img = img.transpose((2, 0, 1))[::-1]  # HWC to CHW, BGR to RGB
         img = np.ascontiguousarray(img)
 
-        return torch.from_numpy(img), labels_out, self.im_files[index], shapes
+        return torch.from_numpy(img), torch.from_numpy(ori_img), labels_out, self.im_files[index], shapes
 
     def load_image(self, i):
         # Loads 1 image from dataset index 'i', returns (im, original hw, resized hw)
@@ -779,10 +790,10 @@ class LoadImagesAndLabels(Dataset):
 
     @staticmethod
     def collate_fn(batch):
-        im, label, path, shapes = zip(*batch)  # transposed
+        im, ori_im, label, path, shapes = zip(*batch)  # transposed
         for i, lb in enumerate(label):
             lb[:, 0] = i  # add target image index for build_targets()
-        return torch.stack(im, 0), torch.cat(label, 0), path, shapes
+        return torch.stack(im, 0), torch.stack(ori_im, 0), torch.cat(label, 0), path, shapes
 
     @staticmethod
     def collate_fn4(batch):
