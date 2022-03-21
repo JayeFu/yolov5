@@ -628,6 +628,8 @@ class LoadImagesAndLabels(Dataset):
             labels_out[:, 1:] = torch.from_numpy(labels)
 
         # Convert
+        ori_img = ori_img.transpose((2, 0, 1))[::-1]  # HWC to CHW, BGR to RGB
+        ori_img = np.ascontiguousarray(ori_img)
         img = img.transpose((2, 0, 1))[::-1]  # HWC to CHW, BGR to RGB
         img = np.ascontiguousarray(img)
 

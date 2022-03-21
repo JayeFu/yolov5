@@ -34,6 +34,8 @@ mixup: 0.0  # image mixup (probability)
 copy_paste: 0.0  # segment copy-paste (probability)
 
 soda:
+  hidden_dim: [512, 512]
+  pred_lr: 0.0003
   background_dir: ""
   augment_dict:
     train:

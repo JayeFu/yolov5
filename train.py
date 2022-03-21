@@ -57,6 +57,8 @@ from utils.metrics import fitness
 from utils.plots import plot_evolve, plot_labels
 from utils.torch_utils import EarlyStopping, ModelEMA, de_parallel, select_device, torch_distributed_zero_first
 
+from drone_racing.adaptation.yolo_integrate.soda_update import SODAUpdater
+
 LOCAL_RANK = int(os.getenv('LOCAL_RANK', -1))  # https://pytorch.org/docs/stable/elastic/run.html
 RANK = int(os.getenv('RANK', -1))
 WORLD_SIZE = int(os.getenv('WORLD_SIZE', 1))
@@ -266,6 +268,9 @@ def train(hyp,  # path/to/hyp.yaml or hyp dictionary
     model.class_weights = labels_to_class_weights(dataset.labels, nc).to(device) * nc  # attach class weights
     model.names = names
 
+    # create soda updater
+    soda_updater = SODAUpdater(model=model, model_ema=ema, optimizer=optimizer, device=device)
+
     # Start training
     t0 = time.time()
     nw = max(round(hyp['warmup_epochs'] * nb), 100)  # number of warmup iterations, max(3 epochs, 100 iterations)
@@ -356,6 +361,9 @@ def train(hyp,  # path/to/hyp.yaml or hyp dictionary
                 if callbacks.stop_training:
                     return
             # end batch ------------------------------------------------------------------------------------------------
+
+        # do soda update
+        soda_updater.update_soda(dataloader=train_loader, loggers=loggers, device=device)
 
         # Scheduler
         lr = [x['lr'] for x in optimizer.param_groups]  # for loggers
